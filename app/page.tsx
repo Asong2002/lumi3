@@ -72,9 +72,12 @@ export default function Home(): JSX.Element {
   // 初始化实验
   const initExp = () => {
     injectAnimationStyles();
-    const sequence = generateSequence();
-    setFeedbackSequence(sequence);
-    console.log("Current Sequence:", sequence);
+    // 只有在没有保存的序列时才生成新序列
+    if (feedbackSequence.length === 0) {
+      const sequence = generateSequence();
+      setFeedbackSequence(sequence);
+      console.log("Current Sequence:", sequence);
+    }
     
     // 设置CSS变量
     const root = document.documentElement;
@@ -231,6 +234,11 @@ export default function Home(): JSX.Element {
           const reply = data.response || 'Sorry, I cannot respond at the moment.';
           const { shouldBlush, showHearts, isEmotional } = checkBlush(reply);
           setMessages((prev: Message[]) => [...prev, { sender: 'bot', content: reply, shouldBlush, showHearts, isEmotional }]);
+          
+          // 检查是否达到最大轮次
+          if (currentRound >= MAX_ROUNDS - 1) {
+            setConversationEnded(true);
+          }
         } else {
           setMessages((prev: Message[]) => [...prev, { 
             sender: 'bot', 
@@ -309,6 +317,11 @@ export default function Home(): JSX.Element {
           setMessages((prev: Message[]) => [...prev, { sender: 'bot', content: reply, shouldBlush, showHearts, isEmotional }]);
           // 触发脸红效果
           triggerBlushEffect();
+          
+          // 检查是否达到最大轮次
+          if (currentRound >= MAX_ROUNDS - 1) {
+            setConversationEnded(true);
+          }
         } else {
           setMessages((prev: Message[]) => [...prev, { 
             sender: 'bot', 
