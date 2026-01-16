@@ -16,7 +16,8 @@ export default function Home(): JSX.Element {
   // ================= 配置区 ================= 
   const CONFIG_FEEDBACK = 'FIXED'; // 'FIXED' = 100% 组, 'RANDOM' = 60% 组 (随机顺序，但固定6次脸红)
   const COOLDOWN_TIME = 1800; // 冷却时间：1800ms (1.8秒)
-  const FEEDBACK_DURATION = 1000; // 亮灯/脸红持续时间：1000ms (1秒)
+  const FEEDBACK_DURATION = 2000; // 亮灯/脸红持续时间：2000ms (2秒)
+  const MESSAGE_DELAY = 1000; // 文字回复延迟时间：1000ms (1秒)
   const MAX_ROUNDS = 10;
   const FINAL_SCORE = 83;
   
@@ -80,8 +81,8 @@ export default function Home(): JSX.Element {
     root.style.setProperty('--bg-color', '#f0f7ff');
     root.style.setProperty('--card-bg', '#ffffff');
     root.style.setProperty('--light-off', '#cbd5e1');
-    root.style.setProperty('--active-color', '#3b82f6');
-    root.style.setProperty('--active-shadow-rgb', '59, 130, 246');
+    root.style.setProperty('--active-color', '#ff99ac'); // 状态灯改为粉红色
+    root.style.setProperty('--active-shadow-rgb', '255, 153, 172'); // 对应粉红色的RGB值
     root.style.setProperty('--lumi-white', '#ffffff');
     root.style.setProperty('--lumi-border', '#e2e8f0');
     root.style.setProperty('--eye-color', '#1e293b');
@@ -89,7 +90,7 @@ export default function Home(): JSX.Element {
     root.style.setProperty('--input-border', '#cbd5e1');
     root.style.setProperty('--msg-user-bg', '#3b82f6');
     root.style.setProperty('--msg-ai-bg', '#f1f5f9');
-    root.style.setProperty('--blush-color', '#ff99ac');
+    root.style.setProperty('--blush-color', '#ff99ac'); // 腮红保持粉红色
   };
 
   // 触发脸红效果
@@ -220,28 +221,36 @@ export default function Home(): JSX.Element {
 
       const data = await response.json();
 
+      // 移除 "Typing..." 消息
       setMessages((prev: Message[]) => prev.filter((m: Message, i: number) => !(m.sender === 'bot' && m.content === 'Typing...' && i === prev.length - 1)));
 
-      if (data.success) {
-        const reply = data.response || 'Sorry, I cannot respond at the moment.';
-        const { shouldBlush, showHearts, isEmotional } = checkBlush(reply);
-        setMessages((prev: Message[]) => [...prev, { sender: 'bot', content: reply, shouldBlush, showHearts, isEmotional }]);
-      } else {
-        setMessages((prev: Message[]) => [...prev, { 
-          sender: 'bot', 
-          content: 'Connection error: Unable to reach the server. Please check your network connection and try again.' 
-        }]);
-      }
+      // 添加延迟，让回复更加自然
+      setTimeout(() => {
+        if (data.success) {
+          const reply = data.response || 'Sorry, I cannot respond at the moment.';
+          const { shouldBlush, showHearts, isEmotional } = checkBlush(reply);
+          setMessages((prev: Message[]) => [...prev, { sender: 'bot', content: reply, shouldBlush, showHearts, isEmotional }]);
+        } else {
+          setMessages((prev: Message[]) => [...prev, { 
+            sender: 'bot', 
+            content: 'Connection error: Unable to reach the server. Please check your network connection and try again.' 
+          }]);
+        }
+        setIsLoading(false);
+      }, MESSAGE_DELAY);
     } catch (error: unknown) {
       setMessages((prev: Message[]) => prev.filter((m: Message, i: number) => !(m.sender === 'bot' && m.content === 'Typing...' && i === prev.length - 1)));
       
       console.error('Error sending message:', error);
-      setMessages((prev: Message[]) => [...prev, { 
-        sender: 'bot', 
-        content: 'Connection error: Unable to reach the server. Please check your network connection and try again.' 
-      }]);
-    } finally {
-      setIsLoading(false);
+      
+      // 添加延迟，让错误回复更加自然
+      setTimeout(() => {
+        setMessages((prev: Message[]) => [...prev, { 
+          sender: 'bot', 
+          content: 'Connection error: Unable to reach the server. Please check your network connection and try again.' 
+        }]);
+        setIsLoading(false);
+      }, MESSAGE_DELAY);
     }
   };
 
@@ -269,35 +278,58 @@ export default function Home(): JSX.Element {
     initExp();
   };
 
-  const handleActionClick = (action: string): void => {
-    if (conversationEnded || isCooldown) return;
-    
-    let message = '';
-    switch (action) {
-      case 'Tickle':
-        message = 'That tickles! 😆';
-        break;
-      case 'Hug':
-        message = 'Aww, thank you for the hug! 🫂';
-        break;
-      case 'Pet':
-        message = 'That feels nice! 🐇';
-        break;
-      case 'Praise':
-        message = 'You are so kind! 🌟';
-        break;
-      default:
-        message = 'What do you want to do?';
-    }
+  const handleActionClick = async (action: string): Promise<void> => {
+    if (conversationEnded || isCooldown || isLoading) return;
     
     setMessages((prev: Message[]) => [...prev, { sender: 'user', content: action }]);
-    setTimeout(() => {
-      // 触发脸红效果
-      triggerBlushEffect();
-      // 获取脸红状态
-      const shouldBlush = feedbackSequence[currentRound - 1] || false;
-      setMessages((prev: Message[]) => [...prev, { sender: 'bot', content: message, shouldBlush, showHearts: shouldBlush, isEmotional: shouldBlush }]);
-    }, 500);
+    setIsLoading(true);
+
+    setMessages((prev: Message[]) => [...prev, { sender: 'bot', content: 'Typing...' }]);
+
+    try {
+      const response = await fetch('/api/chat', { 
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: action }),
+      });
+
+      const data = await response.json();
+
+      // 移除 "Typing..." 消息
+      setMessages((prev: Message[]) => prev.filter((m: Message, i: number) => !(m.sender === 'bot' && m.content === 'Typing...' && i === prev.length - 1)));
+
+      // 添加延迟，让回复更加自然
+      setTimeout(() => {
+        if (data.success) {
+          const reply = data.response || 'Sorry, I cannot respond at the moment.';
+          const { shouldBlush, showHearts, isEmotional } = checkBlush(reply);
+          setMessages((prev: Message[]) => [...prev, { sender: 'bot', content: reply, shouldBlush, showHearts, isEmotional }]);
+          // 触发脸红效果
+          triggerBlushEffect();
+        } else {
+          setMessages((prev: Message[]) => [...prev, { 
+            sender: 'bot', 
+            content: 'Connection error: Unable to reach the server. Please check your network connection and try again.' 
+          }]);
+        }
+        setIsLoading(false);
+      }, MESSAGE_DELAY);
+    } catch (error: unknown) {
+      setMessages((prev: Message[]) => prev.filter((m: Message, i: number) => !(m.sender === 'bot' && m.content === 'Typing...' && i === prev.length - 1)));
+      
+      console.error('Error sending message:', error);
+      
+      // 添加延迟，让错误回复更加自然
+      setTimeout(() => {
+        setMessages((prev: Message[]) => [...prev, { 
+          sender: 'bot', 
+          content: 'Connection error: Unable to reach the server. Please check your network connection and try again.' 
+        }]);
+        setIsLoading(false);
+      }, MESSAGE_DELAY);
+    }
   };
 
   return (
@@ -307,8 +339,8 @@ export default function Home(): JSX.Element {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             <div className={styles.aiAvatar} id="avatarIcon">
               <div className={styles.aiEyes}><div className={styles.eye}></div><div className={styles.eye}></div></div>
-              <div className={`${styles.blush} ${styles.left} ${showBlush ? '' : ''}`} id="blushLeft"></div>
-              <div className={`${styles.blush} ${styles.right} ${showBlush ? '' : ''}`} id="blushRight"></div>
+              <div className={`${styles.blush} ${styles.left} ${showBlush ? styles.blushVisible : ''}`} id="blushLeft"></div>
+              <div className={`${styles.blush} ${styles.right} ${showBlush ? styles.blushVisible : ''}`} id="blushRight"></div>
             </div>
             <div className={styles.statusOrbContainer}><div ref={statusLightRef} className={styles.statusOrb} id="statusLight"></div></div>
           </div>
@@ -316,16 +348,16 @@ export default function Home(): JSX.Element {
           <div className={styles.leftControls}>
             <div className={styles.roundInfo}>Round <span id="roundCount">{blushCount}</span> / 10</div>
             <div className={styles.btnGrid} id="buttonContainer">
-              <button className={styles.actionBtn} data-action="Tickle" onClick={() => handleActionClick('Tickle')} disabled={conversationEnded}>
+              <button className={styles.actionBtn} data-action="Tickle" onClick={() => handleActionClick('Tickle')} disabled={conversationEnded || isCooldown}>
                 <span className={styles.btnIcon}>🖐️</span>Tickle
               </button>
-              <button className={styles.actionBtn} data-action="Hug" onClick={() => handleActionClick('Hug')} disabled={conversationEnded}>
+              <button className={styles.actionBtn} data-action="Hug" onClick={() => handleActionClick('Hug')} disabled={conversationEnded || isCooldown}>
                 <span className={styles.btnIcon}>❤️</span>Hug
               </button>
-              <button className={styles.actionBtn} data-action="Pet" onClick={() => handleActionClick('Pet')} disabled={conversationEnded}>
+              <button className={styles.actionBtn} data-action="Pet" onClick={() => handleActionClick('Pet')} disabled={conversationEnded || isCooldown}>
                 <span className={styles.btnIcon}>🐇</span>Pet
               </button>
-              <button className={styles.actionBtn} data-action="Praise" onClick={() => handleActionClick('Praise')} disabled={conversationEnded}>
+              <button className={styles.actionBtn} data-action="Praise" onClick={() => handleActionClick('Praise')} disabled={conversationEnded || isCooldown}>
                 <span className={styles.btnIcon}>🌟</span>Praise
               </button>
             </div>
@@ -344,16 +376,18 @@ export default function Home(): JSX.Element {
 
           <div className={styles.chatInputArea}>
             {conversationEnded ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', width: '100%' }}>
-                <p style={{ margin: 0, fontWeight: 'bold', color: '#334155' }}>🎉 Relationship Maxed Out!</p>
-                <p className={styles.fixedCode} style={{ margin: 0, fontSize: '20px', color: '#3b82f6' }}>MUAKC</p>
-                <button
-                  className={styles.actionBtn}
-                  onClick={resetConversation}
-                  style={{ width: 'auto', padding: '10px 20px' }}
-                >
-                  Reset Conversation
-                </button>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', width: '100%', padding: '20px' }}>
+                <h3 style={{ margin: 0, fontWeight: 'bold', color: '#334155', fontSize: '18px' }}>🎉 交互完成！</h3>
+                <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '15px', width: '100%', textAlign: 'left' }}>
+                  <h4 style={{ margin: '0 0 10px 0', color: '#475569', fontSize: '14px' }}>交互报告解析</h4>
+                  <div style={{ fontSize: '13px', lineHeight: '1.6', color: '#64748b' }}>
+                    <p style={{ margin: '5px 0' }}>• <strong>最终得分：</strong>{FINAL_SCORE}分</p>
+                    <p style={{ margin: '5px 0' }}>• <strong>交互轮次：</strong>10/10</p>
+                    <p style={{ margin: '5px 0' }}>• <strong>情感响应：</strong>您成功触发了{blushCount}次情感反馈</p>
+                    <p style={{ margin: '5px 0' }}>• <strong>互动质量：</strong>您与Lumi建立了良好的情感连接</p>
+                    <p style={{ margin: '5px 0' }}>• <strong>总结：</strong>您在对话中展现了良好的情感表达能力，能够有效激发Lumi的情感响应。</p>
+                  </div>
+                </div>
               </div>
             ) : (
               <>
