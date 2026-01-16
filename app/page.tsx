@@ -16,8 +16,8 @@ export default function Home(): JSX.Element {
   // ================= 配置区 ================= 
   const CONFIG_FEEDBACK = 'FIXED'; // 'FIXED' = 100% 组, 'RANDOM' = 60% 组 (随机顺序，但固定6次脸红)
   const COOLDOWN_TIME = 1800; // 冷却时间：1800ms (1.8秒)
-  const FEEDBACK_DURATION = 2000; // 亮灯/脸红持续时间：2000ms (2秒)
-  const MESSAGE_DELAY = 1000; // 文字回复延迟时间：1000ms (1秒)
+  const FEEDBACK_DURATION = 1500; // 亮灯/脸红持续时间：1500ms (1.5秒)
+  const MESSAGE_DELAY = 0; // 文字回复延迟时间：0ms (立即回复)
   const MAX_ROUNDS = 10;
   const FINAL_SCORE = 83;
   
@@ -155,46 +155,13 @@ export default function Home(): JSX.Element {
   };
 
   useEffect(() => {
-    const savedBlushCount = localStorage.getItem('blushCount');
-    const savedConversationEnded = localStorage.getItem('conversationEnded');
-    const savedCurrentRound = localStorage.getItem('currentRound');
-    const savedFeedbackSequence = localStorage.getItem('feedbackSequence');
-    
-    // 始终初始化CSS变量
+    // 始终初始化CSS变量和实验序列
     initExp();
     
-    if (savedBlushCount) {
-      setBlushCount(parseInt(savedBlushCount, 10));
-    }
-    
-    if (savedConversationEnded === 'true') {
-      setConversationEnded(true);
-    }
-    
-    if (savedCurrentRound) {
-      setCurrentRound(parseInt(savedCurrentRound, 10));
-    }
-    
-    if (savedFeedbackSequence) {
-      setFeedbackSequence(JSON.parse(savedFeedbackSequence));
-    }
+    // 生成新的反馈序列
+    const sequence = generateSequence();
+    setFeedbackSequence(sequence);
   }, []);
-  
-  useEffect(() => {
-    localStorage.setItem('blushCount', blushCount.toString());
-  }, [blushCount]);
-  
-  useEffect(() => {
-    localStorage.setItem('conversationEnded', conversationEnded.toString());
-  }, [conversationEnded]);
-  
-  useEffect(() => {
-    localStorage.setItem('currentRound', currentRound.toString());
-  }, [currentRound]);
-  
-  useEffect(() => {
-    localStorage.setItem('feedbackSequence', JSON.stringify(feedbackSequence));
-  }, [feedbackSequence]);
 
   useEffect(() => {
     scrollToBottom();
@@ -391,15 +358,13 @@ export default function Home(): JSX.Element {
           <div className={styles.chatInputArea}>
             {conversationEnded ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', width: '100%', padding: '20px' }}>
-                <h3 style={{ margin: 0, fontWeight: 'bold', color: '#334155', fontSize: '18px' }}>🎉 交互完成！</h3>
+                <h3 style={{ margin: 0, fontWeight: 'bold', color: '#334155', fontSize: '18px' }}>🎉 Interaction Complete!</h3>
                 <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '15px', width: '100%', textAlign: 'left' }}>
-                  <h4 style={{ margin: '0 0 10px 0', color: '#475569', fontSize: '14px' }}>交互报告解析</h4>
+                  <h4 style={{ margin: '0 0 10px 0', color: '#475569', fontSize: '14px' }}>Interaction Report</h4>
                   <div style={{ fontSize: '13px', lineHeight: '1.6', color: '#64748b' }}>
-                    <p style={{ margin: '5px 0' }}>• <strong>最终得分：</strong>{FINAL_SCORE}分</p>
-                    <p style={{ margin: '5px 0' }}>• <strong>交互轮次：</strong>10/10</p>
-                    <p style={{ margin: '5px 0' }}>• <strong>情感响应：</strong>您成功触发了{blushCount}次情感反馈</p>
-                    <p style={{ margin: '5px 0' }}>• <strong>互动质量：</strong>您与Lumi建立了良好的情感连接</p>
-                    <p style={{ margin: '5px 0' }}>• <strong>总结：</strong>您在对话中展现了良好的情感表达能力，能够有效激发Lumi的情感响应。</p>
+                    <p style={{ margin: '5px 0' }}>• <strong>Final Score:</strong> {FINAL_SCORE}/100</p>
+                    <p style={{ margin: '5px 0' }}>• <strong>Interaction Quality:</strong> You have established a positive emotional connection with Lumi.</p>
+                    <p style={{ margin: '5px 0' }}>• <strong>Summary:</strong> You demonstrated good communication skills throughout the conversation, effectively interacting with Lumi.</p>
                   </div>
                 </div>
               </div>
