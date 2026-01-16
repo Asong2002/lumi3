@@ -271,7 +271,7 @@
 .chatSendBtn {
   width: 48px;
   height: 48px;
-  background: var(--active-color);
+  background: var(--msg-user-bg);
   border: none;
   border-radius: 14px;
   color: white;
@@ -282,7 +282,7 @@
   justify-content: center;
   transition: transform 0.2s, background-color 0.2s;
   /* 按钮阴影 */
-  box-shadow: 0 4px 10px rgba(var(--active-shadow-rgb), 0.4);
+  box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4);
 }
 
 .chatSendBtn:hover {
